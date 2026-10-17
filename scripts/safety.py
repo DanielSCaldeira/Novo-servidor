@@ -3,6 +3,7 @@
 import hashlib
 import io
 import json
+import re
 import zipfile
 
 REGION = 'sa-saopaulo-1'
@@ -53,6 +54,17 @@ def walk(value):
             yield from walk(item)
 
 
+def configured_resources(module, prefix=''):
+    for resource in module.get('resources', []):
+        yield prefix + resource['address'], resource.get('expressions', {})
+    for name, call in module.get('module_calls', {}).items():
+        yield from configured_resources(call.get('module', {}), prefix + f'module.{name}.')
+
+
+def empty_expression(value):
+    return isinstance(value, dict) and 'constant_value' in value and not value['constant_value']
+
+
 def validate_plan(plan, compartment_id):
     """Only one new A1 plus free basic networking; never update/delete resources."""
     require(plan.get('errored') is not True, 'Plano Terraform contém erro.')
@@ -67,6 +79,7 @@ def validate_plan(plan, compartment_id):
         if isinstance(node, dict):
             require(not node.get('provisioners'), 'Provisioners não são permitidos.')
     instances = []
+    expressions_by_address = dict(configured_resources(configuration.get('root_module', {})))
     for change in plan.get('resource_changes', []):
         kind = change.get('type', '')
         require(change.get('provider_name') == 'registry.terraform.io/oracle/oci',
@@ -83,6 +96,24 @@ def validate_plan(plan, compartment_id):
         after = change.get('change', {}).get('after') or {}
         if kind == 'oci_core_instance':
             instances.append(change)
+            address = re.sub(r'\[[^\]]*\]', '', change.get('address', ''))
+            require(address in expressions_by_address, 'Configuração da instância não encontrada no plano.')
+            expressions = expressions_by_address[address]
+            unknown = change.get('change', {}).get('after_unknown') or {}
+            for field in ('capacity_reservation_id', 'dedicated_vm_host_id', 'instance_configuration_id',
+                          'launch_volume_attachments', 'licensing_configs', 'is_ai_enterprise_enabled',
+                          'preemptible_instance_config', 'compute_cluster_id', 'compute_host_group_id',
+                          'cluster_placement_group_id', 'placement_constraint_details'):
+                # OCI marks many omitted Optional+Computed fields as unknown.
+                # They are safe only if no configuration expression supplies them.
+                configured = field in expressions and not empty_expression(expressions[field])
+                require(not after.get(field) and not (unknown.get(field) and configured),
+                        'Configuração inclui opção adicional ou custo não permitido.')
+            for node in walk(expressions):
+                if isinstance(node, dict):
+                    for field in ('kms_key_id', 'private_ip_id', 'vlan_id'):
+                        require(field not in node or empty_expression(node[field]),
+                                'Configuração usa KMS, IP existente ou VLAN não permitida.')
             require(after.get('display_name') == NAME, 'Nome da instância divergente.')
             require(after.get('shape') == SHAPE, 'Shape divergente.')
             require(after.get('compartment_id') == compartment_id, 'Compartment divergente.')
@@ -93,6 +124,7 @@ def validate_plan(plan, compartment_id):
             require(len(source) == 1 and source[0].get('source_type') == 'image',
                     'Origem da instância deve ser uma imagem.')
             source = source[0]
+            require(not source.get('kms_key_id'), 'Chave KMS personalizada não permitida.')
             size = source.get('boot_volume_size_in_gbs')
             require(isinstance(size, (int, float)) and 0 < size <= 50,
                     'Boot volume deve ter tamanho explícito de até 50 GB.')
@@ -101,6 +133,9 @@ def validate_plan(plan, compartment_id):
             require(bool(source.get('source_id')), 'Imagem ainda desconhecida no plano.')
             require(not after.get('capacity_reservation_id'), 'Reserva de capacidade proibida.')
             require(not after.get('dedicated_vm_host_id'), 'Host dedicado proibido.')
+            for vnic in after.get('create_vnic_details') or []:
+                require(not vnic.get('private_ip_id') and not vnic.get('vlan_id'),
+                        'Não reutilizar IP existente nem VLAN de serviço pago.')
     require(len(instances) == 1, 'Plano deve conter exatamente a instância pretendida.')
     target = instances[0]
     require(target['change']['actions'] == ['create'],

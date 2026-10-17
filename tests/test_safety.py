@@ -10,7 +10,8 @@ PROVIDER = 'registry.terraform.io/oracle/oci'
 
 def plan():
     return {
-        'configuration': {'provider_config': {'oci': {'full_name': PROVIDER}}, 'root_module': {}},
+        'configuration': {'provider_config': {'oci': {'full_name': PROVIDER}}, 'root_module': {
+            'resources': [{'address': 'oci_core_instance.target', 'expressions': {}}]}},
         'resource_changes': [{
             'address': 'oci_core_instance.target', 'type': 'oci_core_instance',
             'mode': 'managed', 'provider_name': PROVIDER,
@@ -66,6 +67,40 @@ class SafetyTests(unittest.TestCase):
         amd['change']['actions'] = ['no-op']
         amd['change']['after']['shape'] = 'VM.Standard.E2.1.Micro'
         value['resource_changes'].append(amd)
+        with self.assertRaises(Blocked):
+            validate_plan(value, 'compartment')
+
+    def test_implicit_paid_options_and_existing_disk_attachments_blocked(self):
+        for field, setting in (
+            ('launch_volume_attachments', [{'volume_id': 'existing-amd-disk'}]),
+            ('instance_configuration_id', 'configuration-with-extra-volumes'),
+            ('is_ai_enterprise_enabled', True),
+            ('licensing_configs', [{'type': 'PAID'}]),
+            ('preemptible_instance_config', [{'preemption_action': []}]),
+        ):
+            value = plan()
+            value['resource_changes'][0]['change']['after'][field] = setting
+            with self.assertRaises(Blocked):
+                validate_plan(value, 'compartment')
+        value = plan()
+        value['resource_changes'][0]['change']['after_unknown'] = {'launch_volume_attachments': True}
+        value['configuration']['root_module']['resources'][0]['expressions'] = {
+            'launch_volume_attachments': {'references': ['var.extra_disks']}}
+        with self.assertRaises(Blocked):
+            validate_plan(value, 'compartment')
+
+    def test_provider_computed_defaults_are_not_mistaken_for_paid_configuration(self):
+        value = plan()
+        value['resource_changes'][0]['change']['after_unknown'] = {
+            'dedicated_vm_host_id': True, 'instance_configuration_id': True,
+            'is_ai_enterprise_enabled': True, 'source_details': [{'kms_key_id': True}]}
+        validate_plan(value, 'compartment')
+
+    def test_paid_option_through_unknown_variable_is_blocked(self):
+        value = plan()
+        value['resource_changes'][0]['change']['after_unknown'] = {'is_ai_enterprise_enabled': True}
+        value['configuration']['root_module']['resources'][0]['expressions'] = {
+            'is_ai_enterprise_enabled': {'references': ['var.enable_paid_ai']}}
         with self.assertRaises(Blocked):
             validate_plan(value, 'compartment')
 
