@@ -6,10 +6,17 @@ from unittest.mock import Mock, patch
 
 from scripts.controller import fresh
 from scripts.github_api import GitHub
-from scripts.tentar_vps import main, public_error
+from scripts.tentar_vps import job_failure_summary, main, public_error
 
 
 class EntrypointTests(unittest.TestCase):
+    def test_job_failure_summary_never_reproduces_sensitive_logs(self):
+        result = job_failure_summary(['Error: 500-InternalError, Out of host capacity', 'SECRET-KEY-CONTENT'])
+        self.assertIn('Out of host capacity', result)
+        self.assertNotIn('SECRET-KEY-CONTENT', result)
+        self.assertIn('QuotaExceeded', job_failure_summary(['Error: QuotaExceeded SECRET-KEY-CONTENT']))
+        self.assertNotIn('SECRET-KEY-CONTENT', job_failure_summary(['Error: SECRET-KEY-CONTENT']))
+
     def test_service_error_reports_category_without_request_or_message(self):
         import oci
         error = oci.exceptions.ServiceError(

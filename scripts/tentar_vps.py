@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.controller import block, fresh, reconcile
 from scripts.github_api import GitHub
-from scripts.safety import Blocked, require, validate_plan
+from scripts.safety import Blocked, capacity_only, require, validate_plan
 
 
 def enabled(name):
@@ -36,6 +36,25 @@ def public_error(error):
     return 'Falha OCI/API (' + ', '.join(details) + '); revisar credenciais, permissões ou configuração.'
 
 
+def job_failure_summary(messages):
+    """Publish a fixed classification, never Terraform logs or their values."""
+    if capacity_only(messages):
+        return 'Out of host capacity: falta temporária de capacidade para criar a instância.'
+    text = '\n'.join(messages).lower()
+    categories = (
+        (('quotaexceeded', 'quota exceeded'), 'QuotaExceeded: cota do compartment excedida.'),
+        (('limitexceeded', 'limit exceeded'), 'LimitExceeded: limite da tenancy excedido.'),
+        (('notauthenticated', 'not authenticated'), 'NotAuthenticated: autenticação recusada.'),
+        (('notauthorized', 'not authorized'), 'NotAuthorized: acesso recusado ou recurso não encontrado.'),
+        (('toomanyrequests', 'too many requests'), 'TooManyRequests: limite de requisições excedido.'),
+        (('invalidparameter', 'invalid parameter'), 'InvalidParameter: parâmetro inválido no provisionamento.'),
+    )
+    for needles, explanation in categories:
+        if any(needle in text for needle in needles):
+            return explanation
+    return 'Erro não classificado automaticamente; detalhes completos permanecem no console privado OCI.'
+
+
 def diagnostic():
     from scripts.oracle_api import Oracle
     oracle = Oracle()
@@ -51,6 +70,9 @@ def diagnostic():
     print('O hash identifica a configuração; não substitui sua revisão do Terraform.')
     for job in jobs[:5]:
         print(f'Job recente: {job.operation} / {job.lifecycle_state}.')
+    failed = next((job for job in jobs if job.operation == 'APPLY' and job.lifecycle_state == 'FAILED'), None)
+    if failed:
+        print('Erro do último Apply falho: ' + job_failure_summary(oracle.logs(failed.id)))
     previous = next((job for job in jobs if job.operation == 'PLAN' and job.lifecycle_state == 'SUCCEEDED'), None)
     if previous:
         target = validate_plan(oracle.plan(previous.id, digest), oracle.compartment_id)
