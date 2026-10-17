@@ -16,6 +16,16 @@ def enabled(name):
     return os.environ.get(name, '').lower() == 'true'
 
 
+def append_summary(markdown):
+    path = os.environ.get('GITHUB_STEP_SUMMARY')
+    if path:
+        try:
+            with open(path, 'a', encoding='utf-8') as summary:
+                summary.write(markdown + '\n\n')
+        except OSError:
+            print('::notice::Não foi possível gravar o resumo visual da execução.')
+
+
 def public_error(error):
     """Expose error categories, never SDK messages/request data or credentials."""
     if isinstance(error, Blocked):
@@ -70,9 +80,23 @@ def diagnostic():
     print('O hash identifica a configuração; não substitui sua revisão do Terraform.')
     for job in jobs[:5]:
         print(f'Job recente: {job.operation} / {job.lifecycle_state}.')
-    failed = next((job for job in jobs if job.operation == 'APPLY' and job.lifecycle_state == 'FAILED'), None)
+    latest_apply = next((job for job in jobs if job.operation == 'APPLY'), None)
+    failed = latest_apply if latest_apply and latest_apply.lifecycle_state == 'FAILED' else None
+    result = 'Nenhum Apply encontrado na stack.'
     if failed:
-        print('Erro do último Apply falho: ' + job_failure_summary(oracle.logs(failed.id)))
+        failure = job_failure_summary(oracle.logs(failed.id))
+        print('Erro do último Apply falho: ' + failure)
+        print('::warning title=Último Apply da Oracle falhou::' + failure)
+        result = '> [!WARNING]\n> **Último Apply: FAILED**\n>\n> **' + failure + '**'
+    elif latest_apply:
+        result = f'**Último Apply: {latest_apply.lifecycle_state}.** Consulte o estado da instância para confirmar a criação.'
+    append_summary(
+        '## Oracle — diagnóstico\n\n' + result + '\n\n'
+        '| Verificação | Resultado |\n| --- | --- |\n'
+        f'| Armazenamento usado | {inventory["storage_gb"]} GB de 200 GB |\n'
+        f'| A1 existentes | {inventory["a1_ocpus"]} OCPUs / {inventory["a1_memory_gb"]} GB RAM |\n'
+        f'| Instâncias com o nome pretendido | {len(inventory["targets"])} |\n\n'
+        'Esta execução é somente leitura e não cria recursos. **Diagnóstico bem-sucedido não confirma uma VPS criada.**')
     previous = next((job for job in jobs if job.operation == 'PLAN' and job.lifecycle_state == 'SUCCEEDED'), None)
     if previous:
         target = validate_plan(oracle.plan(previous.id, digest), oracle.compartment_id)
@@ -110,12 +134,15 @@ def main():
         from scripts.oracle_api import Oracle
         oracle = Oracle()
         reconcile(oracle, gh, state, os.environ['APPROVED_STACK_SHA256'], enabled('RESUME_BLOCKED'))
+        append_summary('## Automação Oracle\n\n**Situação do controle: ' + state['phase'] + '**.\n\n'
+                       'Um job registrado ainda precisa terminar na Oracle. Consulte a Issue de acompanhamento para a confirmação da VPS.')
         print('Consulta concluída. Próxima verificação no próximo horário, sem espera no runner.')
         return 0
     except Exception as error:
         # OCI exception strings may contain request metadata. Never emit traceback/logs.
         reason = public_error(error)
         print('::error::' + reason)
+        append_summary('## Oracle — execução interrompida\n\n> [!CAUTION]\n> **' + reason + '**')
         if gh is not None and state is not None:
             try:
                 # Preserve durable pending tokens after transport errors; recovering the

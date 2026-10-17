@@ -1,5 +1,16 @@
 # VPS Oracle Always Free
 
+[![Última execução da Action](https://github.com/DanielSCaldeira/Novo-servidor/actions/workflows/oracle-vps.yml/badge.svg?branch=main)](https://github.com/DanielSCaldeira/Novo-servidor/actions/workflows/oracle-vps.yml)
+
+**[Abrir execuções e resumo da Oracle](https://github.com/DanielSCaldeira/Novo-servidor/actions/workflows/oracle-vps.yml)** · **[Acompanhar avisos](https://github.com/DanielSCaldeira/Novo-servidor/issues/1)**
+
+> [!WARNING]
+> **Último erro de provisionamento confirmado em 17/10/2026: `Out of host capacity` — Oracle sem capacidade para criar a A1 naquele momento.**
+> Este é um registro histórico. O resultado atualizado da Oracle aparece em destaque no **Summary / Resumo** de cada execução.
+
+> [!NOTE]
+> O badge acima atualiza automaticamente o resultado da Action. Um diagnóstico verde confirma que a consulta funcionou; a criação da VPS precisa ser confirmada separadamente no resultado da Oracle.
+
 Automação para a stack existente **vps-ampere-a1-gratis**, na região **sa-saopaulo-1**.
 As duas VPS AMD existentes não podem ser alteradas pelo plano aceito pelo controlador.
 
