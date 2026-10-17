@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.controller import block, fresh, reconcile
 from scripts.github_api import GitHub
-from scripts.safety import Blocked, require
+from scripts.safety import Blocked, require, validate_plan
 
 
 def enabled(name):
@@ -43,11 +43,21 @@ def diagnostic():
     inventory = oracle.inventory()
     oracle.instances(jobs)
     print('Diagnóstico somente leitura: nenhum job ou recurso foi criado.')
-    print('APPROVED_STACK_SHA256=' + oracle.digest())
+    digest = oracle.digest()
+    print('APPROVED_STACK_SHA256=' + digest)
     print(f'Volumes na home region: {inventory["storage_gb"]} GB / 200 GB.')
     print(f'A1 existentes: {inventory["a1_ocpus"]} OCPUs / {inventory["a1_memory_gb"]} GB RAM.')
     print(f'Instâncias com nome pretendido: {len(inventory["targets"])}.')
     print('O hash identifica a configuração; não substitui sua revisão do Terraform.')
+    for job in jobs[:5]:
+        print(f'Job recente: {job.operation} / {job.lifecycle_state}.')
+    previous = next((job for job in jobs if job.operation == 'PLAN' and job.lifecycle_state == 'SUCCEEDED'), None)
+    if previous:
+        target = validate_plan(oracle.plan(previous.id, digest), oracle.compartment_id)
+        oracle.validate_capacity(target, inventory)
+        print('Plano existente validado: A1 2 OCPUs, 12 GB, Oracle Linux 9, disco até 50 GB; cotas disponíveis.')
+    else:
+        print('Ainda não há Plan concluído para validar antes do Apply.')
 
 
 def main():

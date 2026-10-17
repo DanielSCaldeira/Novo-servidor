@@ -98,7 +98,12 @@ class OracleAdapterTests(unittest.TestCase):
         before = oracle.digest()
         stack.variables = {'cpu': '4'}
         self.assertNotEqual(before, oracle.digest())
-        stack.custom_terraform_provider = 'custom'
+        # This capability flag is enabled by modern stacks, including OCI-only ones.
+        stack.is_third_party_provider_experience_enabled = True
+        oracle.digest()
+        stack.custom_terraform_provider = oci.resource_manager.models.CustomTerraformProvider()
+        oracle.digest()
+        stack.custom_terraform_provider = oci.resource_manager.models.CustomTerraformProvider(bucket_name='custom')
         with self.assertRaises(Blocked):
             oracle.digest()
 

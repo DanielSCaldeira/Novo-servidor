@@ -66,8 +66,8 @@ class Oracle:
         self.stack = self.rm.get_stack(self.stack_id).data
         require(self.stack.config_source.config_source_type == 'ZIP_UPLOAD',
                 'Fonte da configuração mudou; revisão necessária.')
-        require(not self.stack.custom_terraform_provider and
-                not self.stack.is_third_party_provider_experience_enabled,
+        custom = self.stack.custom_terraform_provider
+        require(not custom or not any(oci.util.to_dict(custom).values()),
                 'Providers personalizados não são permitidos.')
         return stack_digest(binary(self.rm.get_stack_tf_config(self.stack_id)),
                             self.stack.variables, self.stack.terraform_version)
