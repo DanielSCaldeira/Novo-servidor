@@ -1,0 +1,17 @@
+# Local credentials must never be committed.
+*.key
+*.pem
+*.p12
+*.pfx
+*.pub
+.oci/
+.env
+.env.*
+!.env.example
+*tfstate*
+*tfplan*
+*.zip
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
