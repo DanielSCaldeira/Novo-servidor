@@ -1,6 +1,7 @@
 """Entrypoint. Diagnostic is read-only and is the default for local execution."""
 
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -13,6 +14,26 @@ from scripts.safety import Blocked, require
 
 def enabled(name):
     return os.environ.get(name, '').lower() == 'true'
+
+
+def public_error(error):
+    """Expose error categories, never SDK messages/request data or credentials."""
+    if isinstance(error, Blocked):
+        return str(error)
+    category = type(error).__name__
+    if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,79}', category):
+        category = 'UnexpectedError'
+    status = getattr(error, 'status', None)
+    code = getattr(error, 'code', '')
+    operation = getattr(error, 'operation_name', '')
+    details = [category]
+    if isinstance(status, int):
+        details.append(f'HTTP {status}')
+    if isinstance(code, str) and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,79}', code):
+        details.append(code)
+    if isinstance(operation, str) and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,79}', operation):
+        details.append(operation)
+    return 'Falha OCI/API (' + ', '.join(details) + '); revisar credenciais, permissões ou configuração.'
 
 
 def diagnostic():
@@ -61,7 +82,7 @@ def main():
         return 0
     except Exception as error:
         # OCI exception strings may contain request metadata. Never emit traceback/logs.
-        reason = str(error) if isinstance(error, Blocked) else 'Falha de API/autenticação ou resposta inesperada; revisar configuração.'
+        reason = public_error(error)
         print('::error::' + reason)
         if gh is not None and state is not None:
             try:

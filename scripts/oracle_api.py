@@ -19,8 +19,11 @@ class Oracle:
         self.stack_id = os.environ['OCI_STACK_ID']
         require(self.stack_id.startswith('ocid1.ormstack.oc1.sa-saopaulo-1.'), 'Stack fora de São Paulo.')
         if os.environ.get('OCI_PRIVATE_KEY'):
-            config = {'tenancy': os.environ['OCI_TENANCY'], 'user': os.environ['OCI_USER'],
-                      'fingerprint': os.environ['OCI_FINGERPRINT'],
+            require(os.environ['OCI_PRIVATE_KEY'].strip().startswith(
+                ('-----BEGIN PRIVATE KEY-----', '-----BEGIN RSA PRIVATE KEY-----')),
+                'OCI_PRIVATE_KEY deve conter o PEM completo da chave de API, não um caminho ou chave SSH.')
+            config = {'tenancy': os.environ['OCI_TENANCY'].strip(), 'user': os.environ['OCI_USER'].strip(),
+                      'fingerprint': os.environ['OCI_FINGERPRINT'].strip(),
                       'key_content': os.environ['OCI_PRIVATE_KEY'], 'region': REGION}
             if os.environ.get('OCI_KEY_PASSPHRASE'):
                 config['pass_phrase'] = os.environ['OCI_KEY_PASSPHRASE']

@@ -6,10 +6,19 @@ from unittest.mock import Mock, patch
 
 from scripts.controller import fresh
 from scripts.github_api import GitHub
-from scripts.tentar_vps import main
+from scripts.tentar_vps import main, public_error
 
 
 class EntrypointTests(unittest.TestCase):
+    def test_service_error_reports_category_without_request_or_message(self):
+        import oci
+        error = oci.exceptions.ServiceError(
+            401, 'NotAuthenticated', {'secret-header': 'SECRET-KEY-CONTENT'}, 'SECRET-KEY-CONTENT')
+        output = public_error(error)
+        self.assertIn('HTTP 401', output)
+        self.assertIn('NotAuthenticated', output)
+        self.assertNotIn('SECRET-KEY-CONTENT', output)
+
     def env(self, **extra):
         return patch.dict(os.environ, {'GITHUB_ACTIONS': 'true', 'DIAGNOSTIC': 'false',
             'TEST_NOTIFICATION': 'false', 'RETRY_ENABLED': 'false', 'RESUME_BLOCKED': 'false',
