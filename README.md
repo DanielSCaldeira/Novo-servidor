@@ -29,7 +29,7 @@ As duas VPS AMD existentes não podem ser alteradas pelo plano aceito pelo contr
 
 ## Custo zero e configuração permitida
 
-Runner **ubuntu-latest padrão**, repositório **público**, sem artifacts, caches ou runners maiores.
+Runner **ubuntu-24.04 padrão**, repositório **público**, sem artifacts, caches ou runners maiores.
 Repositórios públicos não consomem os 2.000 minutos mensais incluídos para repositórios privados do GitHub Free.
 O controlador verifica a visibilidade via API antes de fazer operações na Oracle.
 
