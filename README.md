@@ -5,12 +5,12 @@ As duas VPS AMD existentes não podem ser alteradas pelo plano aceito pelo contr
 
 ## Como funciona
 
-- GitHub Actions consulta a stack manualmente ou a cada 30 minutos, nos minutos 7 e 37.
+- GitHub Actions consulta a stack manualmente ou a cada 10 minutos, nos minutos 7, 17, 27, 37, 47 e 57.
 - Sem jobs paralelos: concurrency no GitHub e consulta dos jobs da stack na Oracle.
 - Primeiro cria um **Plan** na mesma stack; em execução posterior valida o JSON e cria um **Apply daquele plano**.
 - Não usa `AUTO_APPROVED`: aplicar o plano específico impede aceitar mudanças não verificadas.
 - Cada execução consulta ou submete um job e termina. Não há espera pelo provisionamento no runner.
-- O ciclo Plan/Apply ocupa execuções distintas: o intervalo entre Applies costuma ser de pelo menos 60 minutos.
+- O ciclo Plan/Apply ocupa execuções distintas: o intervalo entre Applies costuma ser de pelo menos 20 minutos.
 - Só repete falhas reconhecidas exclusivamente como falta de capacidade. Falhas desconhecidas, autenticação, cota ou configuração pausam e desabilitam o workflow.
 - Se a instância estiver RUNNING e o Apply tiver terminado com sucesso, registra o aviso na Issue e desabilita o workflow.
 - Se a máquina existir após Apply parcialmente falho, pausa para revisão, sem criar outra.
