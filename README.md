@@ -168,6 +168,11 @@ Não é uma fila de reserva de capacidade nem garantia de disponibilidade.
 
 ### Reserva para falhas do cron
 
+**Atualização:** a tarefa de reserva Windows foi removida, pois a operação desejada deve
+independer do computador local. Os scripts permanecem opcionais no repositório, mas
+não fazem parte da configuração ativa. O cron GitHub continua habilitado; sua entrega
+pontual não está garantida e o disparo abaixo da reserva não comprova o cron.
+
 Em 18/10/2026 às 14:58 UTC, o workflow estava ativo e as flags corretas,
 mas nenhum evento `schedule` havia sido criado desde a ativação. As execuções
 anteriores eram `workflow_dispatch`; elas não comprovavam o funcionamento do cron.
