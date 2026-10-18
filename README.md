@@ -120,6 +120,10 @@ deve ser validada no diagnóstico/primeiro Plan. Falta de acesso pausa, sem tent
 
 ## Ativação
 
+**Ativação realizada em 18/10/2026:** tentativas habilitadas, com os limites de A1 2 OCPUs/12 GB e disco 50 GB/Balanced. O Plan real revelou provider OCI legado e disco indefinido; ambos foram tratados antes do Apply. Os campos de disco em string são normalizados conforme o schema OCI. O estado atualizado permanece na [Issue de acompanhamento](https://github.com/DanielSCaldeira/Novo-servidor/issues/1).
+
+O input manual `configure_boot_disk` prepara **somente** os atributos de disco na configuração ZIP da stack aprovada. Exige inventário sem A1, até 150 GB usados, ausência de jobs ativos e ETag, e não cria recursos. Precisa de permissão para atualizar essa stack. Depois da edição, registrar o novo hash aprovado e retomar com `resume_blocked=true`; no uso normal manter esse input **false**. Não altera state nem arquivos fora do resource da instância. Expressões complexas ou configurações ambíguas são recusadas.
+
 1. Cadastrar os Secrets e manter `RETRY_ENABLED=false`.
 2. Em **Actions → Oracle Always Free VPS → Run workflow**, executar com `diagnostic=true`.
    É somente leitura, inclusive no GitHub: mostra o hash da configuração e contadores agregados.
