@@ -72,3 +72,10 @@ jobs:
           OCI_KEY_PASSPHRASE: ${{ secrets.OCI_KEY_PASSPHRASE }}
           GH_TOKEN: ${{ github.token }}
         run: python scripts/tentar_vps.py
+
+      - name: Ping Healthchecks (sucesso)
+        if: success()
+        run: curl -fsS -m 10 --retry 3 https://hc-ping.com/f54c6b85-5e72-4dad-91e6-11c49b7307e9
+      - name: Ping Healthchecks (falha)
+        if: failure()
+        run: curl -fsS -m 10 --retry 3 https://hc-ping.com/f54c6b85-5e72-4dad-91e6-11c49b7307e9/fail
