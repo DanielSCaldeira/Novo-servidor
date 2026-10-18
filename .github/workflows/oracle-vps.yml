@@ -3,6 +3,10 @@ name: Oracle Always Free VPS
 on:
   workflow_dispatch:
     inputs:
+      run_tests:
+        description: 'Executar testes também em uma tentativa normal'
+        type: boolean
+        default: false
       diagnostic:
         description: 'Diagnóstico somente leitura (não cria jobs nem Issues)'
         type: boolean
@@ -58,7 +62,8 @@ jobs:
       - name: Install SDK
         run: python -m pip install --disable-pip-version-check -r requirements.txt
       - name: Tests
-        if: github.event_name != 'schedule'
+        # External dispatch retries use diagnostic=false and omit run_tests.
+        if: github.event_name == 'workflow_dispatch' && (inputs.run_tests || inputs.diagnostic || inputs.configure_boot_disk || inputs.test_notification || inputs.resume_blocked)
         run: python -m unittest discover -s tests -v
       - name: Check stack / attempt once
         env:

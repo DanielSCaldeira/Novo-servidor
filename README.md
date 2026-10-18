@@ -166,9 +166,14 @@ Não é uma fila de reserva de capacidade nem garantia de disponibilidade.
 
 ## Desenvolvimento e diagnóstico local
 
-Execuções automáticas (`schedule`) pulam o step `Tests` para reduzir o trabalho
-de cada tentativa. Execuções manuais continuam rodando a suíte. As validações
-operacionais do controlador, do plano e dos limites permanecem em todos os modos.
+Tentativas normais pulam o step `Tests`, tanto por `schedule` quanto por
+`workflow_dispatch` externo do cron-job.org com `diagnostic=false`.
+Não é preciso alterar a chamada externa: `run_tests` é opcional e tem padrão `false`.
+Diagnóstico e manutenção (`configure_boot_disk`, `test_notification`, `resume_blocked`)
+continuam rodando a suíte. Para testar uma tentativa normal manualmente, marque
+`run_tests=true`. As validações operacionais do controlador, do plano e dos limites
+permanecem em todos os modos. GitHub não distingue um dispatch manual de um externo;
+essa seleção é feita pelos inputs, não pela identidade de quem chama.
 
 ### Reserva para falhas do cron
 
