@@ -166,6 +166,10 @@ Não é uma fila de reserva de capacidade nem garantia de disponibilidade.
 
 ## Desenvolvimento e diagnóstico local
 
+Execuções automáticas (`schedule`) pulam o step `Tests` para reduzir o trabalho
+de cada tentativa. Execuções manuais continuam rodando a suíte. As validações
+operacionais do controlador, do plano e dos limites permanecem em todos os modos.
+
 ### Reserva para falhas do cron
 
 **Atualização:** a tarefa de reserva Windows foi removida, pois a operação desejada deve
