@@ -10,6 +10,39 @@ from scripts.tentar_vps import job_failure_summary, main, public_error, provider
 
 
 class EntrypointTests(unittest.TestCase):
+    def test_temporary_oci_errors_preserve_pending_token_and_enabled_workflow(self):
+        import oci
+        for status in (429, 500, 502, 503, 504):
+            with self.subTest(status=status):
+                gh = Mock(spec=GitHub)
+                state = dict(fresh(), phase='pending', token='durable-token', operation='PLAN')
+                gh.load.return_value = state
+                output = io.StringIO()
+                with self.env(RETRY_ENABLED='true', ZERO_COST_CONFIRMED='true', APPROVED_STACK_SHA256='a'*64), \
+                        patch('scripts.tentar_vps.GitHub', return_value=gh), \
+                        patch('scripts.oracle_api.Oracle'), \
+                        patch('scripts.tentar_vps.reconcile', side_effect=oci.exceptions.ServiceError(
+                            status, 'TooManyRequests', {}, 'SECRET-KEY-CONTENT')), \
+                        contextlib.redirect_stdout(output):
+                    self.assertEqual(main(), 1)
+                self.assertEqual(state['phase'], 'pending')
+                self.assertEqual(state['token'], 'durable-token')
+                gh.disable.assert_not_called()
+                gh.notify.assert_not_called()
+                self.assertNotIn('SECRET-KEY-CONTENT', output.getvalue())
+
+    def test_permanent_oci_auth_error_still_blocks(self):
+        import oci
+        gh = Mock(spec=GitHub)
+        gh.load.return_value = fresh()
+        with self.env(RETRY_ENABLED='true', ZERO_COST_CONFIRMED='true', APPROVED_STACK_SHA256='a'*64), \
+                patch('scripts.tentar_vps.GitHub', return_value=gh), \
+                patch('scripts.oracle_api.Oracle', side_effect=oci.exceptions.ServiceError(
+                    401, 'NotAuthenticated', {}, 'secret')), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(main(), 1)
+        gh.disable.assert_called_once()
+        self.assertEqual(gh.load.return_value['phase'], 'blocked')
+
     def test_disk_configuration_never_runs_controller_or_sends_messages(self):
         oracle = Mock()
         oracle.configure_boot_disk.return_value = 'b' * 64

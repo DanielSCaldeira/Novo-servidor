@@ -185,6 +185,19 @@ def main():
         print('Consulta concluída. Próxima verificação no próximo horário, sem espera no runner.')
         return 0
     except Exception as error:
+        from oci.exceptions import ServiceError
+        # Retry OCI throttling/service outages on the next external tick. A pending
+        # submission retains its durable token, including when the response was lost.
+        if (isinstance(error, ServiceError) and error.status in (429, 500, 502, 503, 504)
+                and gh is not None and state is not None
+                and state['phase'] in ('ready', 'pending', 'tracking')):
+            print(f'::warning::OCI HTTP {error.status}: falha temporária; nova consulta no próximo disparo.')
+            append_summary('## Oracle — aguardar próximo disparo\n\n'
+                           f'HTTP {error.status} temporário. Workflow mantido ativo; '
+                           'estado e token preservados para recuperação sem duplicidade.')
+            # Do not disable, notify a terminal failure, or discard pending tokens.
+            # The submission token is persisted before calling OCI by the controller.
+            return 1
         # OCI exception strings may contain request metadata. Never emit traceback/logs.
         reason = public_error(error)
         print('::error::' + reason)

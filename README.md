@@ -166,6 +166,12 @@ Não é uma fila de reserva de capacidade nem garantia de disponibilidade.
 
 ## Desenvolvimento e diagnóstico local
 
+Erros temporários da API OCI HTTP 429/500/502/503/504 deixam a execução com falha,
+mas não desabilitam o workflow. O próximo disparo do cron-job.org tenta novamente;
+solicitações pendentes preservam o token para evitar duplicidade. Erros de autenticação,
+configuração e limites de recursos continuam bloqueando. Em 18/10/2026 um HTTP 429
+em `create_job` revelou esse bloqueio indevido; o tratamento foi corrigido.
+
 Tentativas normais pulam o step `Tests`, tanto por `schedule` quanto por
 `workflow_dispatch` externo do cron-job.org com `diagnostic=false`.
 Não é preciso alterar a chamada externa: `run_tests` é opcional e tem padrão `false`.
