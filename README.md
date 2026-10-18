@@ -166,6 +166,12 @@ Não é uma fila de reserva de capacidade nem garantia de disponibilidade.
 
 ## Desenvolvimento e diagnóstico local
 
+Verificação operacional em 18/10/2026: o [run 39135435923](https://github.com/DanielSCaldeira/Novo-servidor/actions/runs/39135435923)
+validou o Plan e submeteu Apply real. O [run 39135606774](https://github.com/DanielSCaldeira/Novo-servidor/actions/runs/39135606774)
+reconheceu a falha exclusiva de capacidade e submeteu outro Plan automaticamente, sem retomada manual.
+Workflow ativo, `RETRY_ENABLED=true`, `ZERO_COST_CONFIRMED=true`; 50 testes passaram.
+Esse registro confirma o ciclo de repetição, não a criação da instância. O estado atual fica na Issue de controle.
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements.txt
