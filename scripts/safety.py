@@ -1,6 +1,7 @@
 """Fail-closed rules. Never log a Terraform plan or state."""
 
 import hashlib
+import copy
 import io
 import json
 import re
@@ -68,6 +69,17 @@ def empty_expression(value):
     return isinstance(value, dict) and 'constant_value' in value and not value['constant_value']
 
 
+def disk_integer(value):
+    # The OCI provider declares disk sizes/VPUs as TypeString, even in JSON plans.
+    if type(value) is int:
+        return value
+    if type(value) is float and value.is_integer():
+        return int(value)
+    if isinstance(value, str) and re.fullmatch(r'[0-9]{1,6}', value):
+        return int(value)
+    return None
+
+
 def validate_plan(plan, compartment_id):
     """Only one new A1 plus free basic networking; never update/delete resources."""
     require(plan.get('errored') is not True, 'Plano Terraform contém erro.')
@@ -128,10 +140,11 @@ def validate_plan(plan, compartment_id):
                     'Origem da instância deve ser uma imagem.')
             source = source[0]
             require(not source.get('kms_key_id'), 'Chave KMS personalizada não permitida.')
-            size = source.get('boot_volume_size_in_gbs')
-            require(isinstance(size, (int, float)) and 0 < size <= 50,
+            size = disk_integer(source.get('boot_volume_size_in_gbs'))
+            require(size is not None and 0 < size <= 50,
                     'Boot volume deve ter tamanho explícito de até 50 GB.')
-            require(source.get('boot_volume_vpus_per_gb') in (None, 10),
+            vpus = source.get('boot_volume_vpus_per_gb')
+            require(vpus is None or disk_integer(vpus) == 10,
                     'Boot volume deve usar desempenho Balanced.')
             require(bool(source.get('source_id')), 'Imagem ainda desconhecida no plano.')
             require(not after.get('capacity_reservation_id'), 'Reserva de capacidade proibida.')
@@ -143,7 +156,10 @@ def validate_plan(plan, compartment_id):
     target = instances[0]
     require(target['change']['actions'] == ['create'],
             'Plano não cria a instância; reconciliar estado antes de continuar.')
-    values = target['change']['after']
+    values = copy.deepcopy(target['change']['after'])
+    values['source_details'][0]['boot_volume_size_in_gbs'] = disk_integer(values['source_details'][0]['boot_volume_size_in_gbs'])
+    if values['source_details'][0].get('boot_volume_vpus_per_gb') is not None:
+        values['source_details'][0]['boot_volume_vpus_per_gb'] = disk_integer(values['source_details'][0]['boot_volume_vpus_per_gb'])
     require(bool(values.get('availability_domain')), 'Availability domain desconhecido.')
     return values
 

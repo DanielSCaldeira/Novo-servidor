@@ -37,6 +37,23 @@ class SafetyTests(unittest.TestCase):
     def test_expected_plan_allowed(self):
         self.assertEqual(validate_plan(plan(), 'compartment')['shape'], 'VM.Standard.A1.Flex')
 
+    def test_oci_string_disk_values_normalized_without_mutating_plan(self):
+        value = plan()
+        disk = value['resource_changes'][0]['change']['after']['source_details'][0]
+        disk.update(boot_volume_size_in_gbs='50', boot_volume_vpus_per_gb='10')
+        target = validate_plan(value, 'compartment')
+        self.assertEqual(target['source_details'][0]['boot_volume_size_in_gbs'], 50)
+        self.assertEqual(target['source_details'][0]['boot_volume_vpus_per_gb'], 10)
+        self.assertEqual(disk['boot_volume_size_in_gbs'], '50')
+
+    def test_invalid_or_expensive_disk_values_still_blocked(self):
+        for field, bad in [('boot_volume_size_in_gbs', x) for x in ('51', '50.5', '5e1', None, True, 50.5)] + [('boot_volume_vpus_per_gb', x) for x in ('20', '10.0', True)]:
+            with self.subTest(field=field, value=bad):
+                value = plan()
+                value['resource_changes'][0]['change']['after']['source_details'][0][field] = bad
+                with self.assertRaises(Blocked):
+                    validate_plan(value, 'compartment')
+
     def test_official_legacy_oci_namespace_allowed(self):
         value = plan()
         legacy = 'registry.terraform.io/hashicorp/oci'
