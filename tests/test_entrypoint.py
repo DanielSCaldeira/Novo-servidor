@@ -10,6 +10,22 @@ from scripts.tentar_vps import job_failure_summary, main, public_error, provider
 
 
 class EntrypointTests(unittest.TestCase):
+    def test_disk_configuration_never_runs_controller_or_sends_messages(self):
+        oracle = Mock()
+        oracle.configure_boot_disk.return_value = 'b' * 64
+        with self.env(CONFIGURE_BOOT_DISK='true', ZERO_COST_CONFIRMED='true', APPROVED_STACK_SHA256='a'*64), \
+                patch('scripts.oracle_api.Oracle', return_value=oracle), \
+                patch('scripts.tentar_vps.GitHub') as gh, contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(main(), 0)
+        oracle.configure_boot_disk.assert_called_once_with('a'*64)
+        gh.assert_not_called()
+
+    def test_disk_configuration_requires_confirmed_scope(self):
+        with self.env(CONFIGURE_BOOT_DISK='true'), patch('scripts.oracle_api.Oracle') as oracle, \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(main(), 1)
+        oracle.assert_not_called()
+
     def test_disk_summary_only_exposes_numeric_disk_fields(self):
         import json
         summary = disk_summary({'resource_changes':[{'type':'oci_core_instance','change':{'after':{

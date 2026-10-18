@@ -9,6 +9,10 @@ on:
         description: 'Diagnóstico somente leitura (não cria jobs nem Issues)'
         type: boolean
         default: true
+      configure_boot_disk:
+        description: 'Preparar somente disco 50 GB/Balanced na stack aprovada, sem criar recursos'
+        type: boolean
+        default: false
       test_notification:
         description: 'Enviar aviso de teste na Issue, sem chamar a Oracle'
         type: boolean
@@ -43,6 +47,7 @@ jobs:
       NOTIFY_USER: DanielSCaldeira
       RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
       DIAGNOSTIC: ${{ github.event_name == 'workflow_dispatch' && inputs.diagnostic || false }}
+      CONFIGURE_BOOT_DISK: ${{ github.event_name == 'workflow_dispatch' && inputs.configure_boot_disk || false }}
       TEST_NOTIFICATION: ${{ github.event_name == 'workflow_dispatch' && inputs.test_notification || false }}
       RESUME_BLOCKED: ${{ github.event_name == 'workflow_dispatch' && inputs.resume_blocked || false }}
     steps:

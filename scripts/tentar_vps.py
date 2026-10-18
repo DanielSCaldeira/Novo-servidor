@@ -147,6 +147,14 @@ def diagnostic():
 def main():
     gh = state = None
     try:
+        if enabled('CONFIGURE_BOOT_DISK'):
+            from scripts.oracle_api import Oracle
+            require(enabled('ZERO_COST_CONFIRMED'), 'Escopo gratuito não confirmado.')
+            digest = Oracle().configure_boot_disk(os.environ.get('APPROVED_STACK_SHA256',''))
+            print('Disco da stack configurado para 50 GB / 10 VPUs. Nenhum job de provisionamento criado.')
+            print('NEW_STACK_SHA256=' + digest)
+            append_summary('## Configuração da stack\n\nDisco explícito: **50 GB / Balanced 10 VPUs**. Nenhum recurso criado. Atualizar o hash aprovado antes de retomar.')
+            return 0
         if enabled('DIAGNOSTIC') or not os.environ.get('GITHUB_ACTIONS'):
             diagnostic()
             return 0

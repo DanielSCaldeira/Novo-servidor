@@ -2,6 +2,7 @@
 
 import json
 import os
+import base64
 
 import oci
 
@@ -71,6 +72,29 @@ class Oracle:
                 'Providers personalizados não são permitidos.')
         return stack_digest(binary(self.rm.get_stack_tf_config(self.stack_id)),
                             self.stack.variables, self.stack.terraform_version)
+
+    def configure_boot_disk(self, approved):
+        from scripts.stack_config import fix_disk_zip
+        require(not any(j.lifecycle_state in {'ACCEPTED','IN_PROGRESS','CANCELING','CANCELLING'} for j in self.jobs()),
+                'Aguardar jobs ativos antes de ajustar configuração da stack.')
+        inventory = self.inventory()
+        require(not inventory['targets'] and inventory['a1_ocpus'] == 0 and inventory['a1_memory_gb'] == 0
+                and inventory['storage_gb'] <= 150, 'Inventário não permite preparar uma nova A1 de 50 GB.')
+        response = self.rm.get_stack(self.stack_id)
+        stack = response.data
+        require(stack.config_source.config_source_type == 'ZIP_UPLOAD', 'Somente ZIP estático permitido.')
+        data = binary(self.rm.get_stack_tf_config(self.stack_id))
+        require(stack_digest(data, stack.variables, stack.terraform_version) == approved,
+                'Configuração mudou; nenhuma edição permitida.')
+        require(bool(response.headers.get('etag')), 'ETag da stack ausente; não editar concorrente.')
+        updated = fix_disk_zip(data)
+        details = oci.resource_manager.models.UpdateStackDetails(
+            config_source=oci.resource_manager.models.UpdateZipUploadConfigSourceDetails(
+                zip_file_base64_encoded=base64.b64encode(updated).decode()))
+        self.rm.update_stack(self.stack_id, details, if_match=response.headers['etag'])
+        expected = stack_digest(updated, stack.variables, stack.terraform_version)
+        require(self.digest() == expected, 'Hash após edição divergente; revisar antes de provisionar.')
+        return expected
 
     def jobs(self):
         return self.all(self.rm.list_jobs, compartment_id=self.compartment_id,
