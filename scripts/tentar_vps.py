@@ -81,6 +81,24 @@ def provider_summary(plan):
     return {'configuration': rows, 'resource_providers': resources}
 
 
+def disk_summary(plan):
+    """Whitelist disk scalars, with their JSON types, to diagnose schema differences."""
+    result = []
+    for change in plan.get('resource_changes', []):
+        if change.get('type') != 'oci_core_instance':
+            continue
+        source = (change.get('change', {}).get('after', {}).get('source_details') or [{}])[0]
+        row = {}
+        for key in ('boot_volume_size_in_gbs', 'boot_volume_vpus_per_gb'):
+            value = source.get(key)
+            safe = value if type(value) in (int, float) and 0 <= value <= 10000 else None
+            if isinstance(value, str) and re.fullmatch(r'[0-9]{1,5}(?:\.0+)?', value):
+                safe = value
+            row[key] = {'type': type(value).__name__, 'value': safe}
+        result.append(row)
+    return result
+
+
 def diagnostic():
     from scripts.oracle_api import Oracle
     oracle = Oracle()
@@ -118,6 +136,7 @@ def diagnostic():
         import json
         plan = oracle.plan(previous.id, digest)
         print('Esquema de providers do Plan: ' + json.dumps(provider_summary(plan), sort_keys=True))
+        print('Disco da instância no Plan: ' + json.dumps(disk_summary(plan), sort_keys=True))
         target = validate_plan(plan, oracle.compartment_id)
         oracle.validate_capacity(target, inventory)
         print('Plano existente validado: A1 2 OCPUs, 12 GB, Oracle Linux 9, disco até 50 GB; cotas disponíveis.')

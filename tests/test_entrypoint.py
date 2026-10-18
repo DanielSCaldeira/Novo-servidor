@@ -6,10 +6,17 @@ from unittest.mock import Mock, patch
 
 from scripts.controller import fresh
 from scripts.github_api import GitHub
-from scripts.tentar_vps import job_failure_summary, main, public_error, provider_summary
+from scripts.tentar_vps import job_failure_summary, main, public_error, provider_summary, disk_summary
 
 
 class EntrypointTests(unittest.TestCase):
+    def test_disk_summary_only_exposes_numeric_disk_fields(self):
+        import json
+        summary = disk_summary({'resource_changes':[{'type':'oci_core_instance','change':{'after':{
+            'source_details':[{'boot_volume_size_in_gbs':'50', 'boot_volume_vpus_per_gb':'SECRET-KEY-CONTENT'}]}}}]})
+        self.assertNotIn('SECRET-KEY-CONTENT', json.dumps(summary))
+        self.assertEqual(summary[0]['boot_volume_size_in_gbs'], {'type':'str','value':'50'})
+
     def test_provider_summary_does_not_expose_plan_values(self):
         import json
         summary = provider_summary({'configuration': {'provider_config': {'oci': {
