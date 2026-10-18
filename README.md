@@ -166,6 +166,29 @@ Não é uma fila de reserva de capacidade nem garantia de disponibilidade.
 
 ## Desenvolvimento e diagnóstico local
 
+### Reserva para falhas do cron
+
+Em 18/10/2026 às 14:58 UTC, o workflow estava ativo e as flags corretas,
+mas nenhum evento `schedule` havia sido criado desde a ativação. As execuções
+anteriores eram `workflow_dispatch`; elas não comprovavam o funcionamento do cron.
+O cron foi renovado para os minutos 3,13,23,33,43,53. O GitHub documenta que
+[eventos agendados podem atrasar ou ser descartados](https://docs.github.com/en/actions/how-tos/troubleshoot-workflows).
+
+Uma reserva local foi instalada no Windows com `scripts/Install-DispatchWatchdog.ps1`.
+A tarefa `Novo-servidor GitHub retry watchdog` roda sem janela a cada 10 minutos e no login.
+Usa a autenticação existente do `gh`, sem copiar tokens ou acessar a Oracle.
+Só dispara o workflow quando ele está ativo, ambas as flags estão `true`,
+não há run ativo/em fila e a última execução tem pelo menos 9 minutos.
+Nunca reabilita workflow, altera flags ou usa `resume_blocked=true`.
+Assim, bloqueio ou sucesso do controlador também interrompe os disparos de reserva.
+Os disparos dessa tarefa aparecem como `workflow_dispatch`, não `schedule`.
+
+**A reserva exige computador ligado e usuário conectado.** O cron do GitHub
+continua independente do PC, mas não tem garantia de pontualidade.
+Log local: `%LOCALAPPDATA%\Novo-servidor\dispatch-watchdog.log`.
+Diagnóstico sem disparo: `.\.venv\Scripts\python scripts/dispatch_watchdog.py --dry-run`.
+Remoção: `Unregister-ScheduledTask -TaskName 'Novo-servidor GitHub retry watchdog' -Confirm:$false`.
+
 Verificação operacional em 18/10/2026: o [run 39135435923](https://github.com/DanielSCaldeira/Novo-servidor/actions/runs/39135435923)
 validou o Plan e submeteu Apply real. O [run 39135606774](https://github.com/DanielSCaldeira/Novo-servidor/actions/runs/39135606774)
 reconheceu a falha exclusiva de capacidade e submeteu outro Plan automaticamente, sem retomada manual.
