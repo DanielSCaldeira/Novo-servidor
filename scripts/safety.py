@@ -10,6 +10,9 @@ REGION = 'sa-saopaulo-1'
 SHAPE = 'VM.Standard.A1.Flex'
 NAME = 'vps-ampere-a1'
 STACK_NAME = 'vps-ampere-a1-gratis'
+# OCI Resource Manager can retain the official legacy namespace in existing stacks.
+# https://docs.oracle.com/en-us/iaas/Content/dev/terraform/migrating-legacy.htm
+OCI_PROVIDERS = frozenset({'registry.terraform.io/oracle/oci', 'registry.terraform.io/hashicorp/oci'})
 NETWORK = {
     'oci_core_vcn', 'oci_core_subnet', 'oci_core_internet_gateway',
     'oci_core_route_table', 'oci_core_security_list',
@@ -73,8 +76,8 @@ def validate_plan(plan, compartment_id):
     providers = configuration.get('provider_config', {})
     require(bool(providers), 'Plano sem provider verificável.')
     for provider in providers.values():
-        require(provider.get('full_name') == 'registry.terraform.io/oracle/oci',
-                'Provider não permitido: somente oracle/oci.')
+        require(provider.get('full_name') in OCI_PROVIDERS,
+                'Provider não permitido: somente OCI oficial atual ou legado.')
     for node in walk(configuration):
         if isinstance(node, dict):
             require(not node.get('provisioners'), 'Provisioners não são permitidos.')
@@ -82,7 +85,7 @@ def validate_plan(plan, compartment_id):
     expressions_by_address = dict(configured_resources(configuration.get('root_module', {})))
     for change in plan.get('resource_changes', []):
         kind = change.get('type', '')
-        require(change.get('provider_name') == 'registry.terraform.io/oracle/oci',
+        require(change.get('provider_name') in OCI_PROVIDERS,
                 'Recurso usa provider não permitido.')
         actions = change.get('change', {}).get('actions')
         if change.get('mode') == 'data':

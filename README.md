@@ -87,6 +87,12 @@ Criar um usuário/grupo dedicado para a chave de API. A stack precisa usar confi
 ZIP estática, com provider oficial `oracle/oci`; fontes Git/Object Storage dinâmicas e
 providers personalizados são recusados.
 
+Stacks existentes também podem registrar o namespace oficial legado `hashicorp/oci`,
+conforme a [documentação de migração da Oracle](https://docs.oracle.com/en-us/iaas/Content/dev/terraform/migrating-legacy.htm).
+O validador aceita exclusivamente os endereços completos desses dois providers no registry oficial;
+não aceita outros hosts, namespaces ou providers. Isso evita bloquear o Plan da stack existente
+sem alterar o Terraform, o state ou as verificações de recursos e custo.
+
 O inventário exige leitura em toda a tenancy para não ignorar consumo de outro compartment.
 Exemplo de política, substituindo grupo e compartment (revisar com o administrador OCI):
 

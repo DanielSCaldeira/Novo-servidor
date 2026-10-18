@@ -37,6 +37,26 @@ class SafetyTests(unittest.TestCase):
     def test_expected_plan_allowed(self):
         self.assertEqual(validate_plan(plan(), 'compartment')['shape'], 'VM.Standard.A1.Flex')
 
+    def test_official_legacy_oci_namespace_allowed(self):
+        value = plan()
+        legacy = 'registry.terraform.io/hashicorp/oci'
+        value['configuration']['provider_config']['oci']['full_name'] = legacy
+        value['resource_changes'][0]['provider_name'] = legacy
+        self.assertEqual(validate_plan(value, 'compartment')['shape'], 'VM.Standard.A1.Flex')
+
+    def test_unofficial_or_lookalike_oci_provider_blocked(self):
+        for source in ('example.com/oracle/oci', 'registry.terraform.io/other/oci',
+                       'registry.terraform.io/hashicorp/external', 'oci', 'oracle/oci'):
+            for location in ('configuration', 'resource'):
+                with self.subTest(source=source, location=location):
+                    value = plan()
+                    if location == 'configuration':
+                        value['configuration']['provider_config']['oci']['full_name'] = source
+                    else:
+                        value['resource_changes'][0]['provider_name'] = source
+                    with self.assertRaises(Blocked):
+                        validate_plan(value, 'compartment')
+
     def test_mutation_or_paid_resources_blocked(self):
         mutations = [
             lambda p: p['resource_changes'][0]['change'].update(actions=['update']),
