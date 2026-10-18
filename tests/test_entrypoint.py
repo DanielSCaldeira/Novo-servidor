@@ -6,10 +6,21 @@ from unittest.mock import Mock, patch
 
 from scripts.controller import fresh
 from scripts.github_api import GitHub
-from scripts.tentar_vps import job_failure_summary, main, public_error
+from scripts.tentar_vps import job_failure_summary, main, public_error, provider_summary
 
 
 class EntrypointTests(unittest.TestCase):
+    def test_provider_summary_does_not_expose_plan_values(self):
+        import json
+        summary = provider_summary({'configuration': {'provider_config': {'oci': {
+            'name': 'oci', 'full_name': 'SECRET-KEY-CONTENT',
+            'expressions': {'private_key': 'SECRET-KEY-CONTENT'}}}},
+            'resource_changes': [{'provider_name': 'registry.terraform.io/oracle/oci',
+                                  'change': {'after': {'private_key': 'SECRET-KEY-CONTENT'}}}]})
+        self.assertNotIn('SECRET-KEY-CONTENT', json.dumps(summary))
+        self.assertEqual(summary['configuration'][0]['name'], 'oci')
+        self.assertEqual(summary['resource_providers'], ['registry.terraform.io/oracle/oci'])
+
     def test_job_failure_summary_never_reproduces_sensitive_logs(self):
         result = job_failure_summary(['Error: 500-InternalError, Out of host capacity', 'SECRET-KEY-CONTENT'])
         self.assertIn('Out of host capacity', result)

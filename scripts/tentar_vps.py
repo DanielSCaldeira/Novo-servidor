@@ -65,6 +65,22 @@ def job_failure_summary(messages):
     return 'Erro não classificado automaticamente; detalhes completos permanecem no console privado OCI.'
 
 
+def provider_summary(plan):
+    """Expose only recognized provider identifiers and schema keys, never plan values."""
+    known = {'oracle/oci', 'registry.terraform.io/oracle/oci',
+             'hashicorp/oci', 'registry.terraform.io/hashicorp/oci', 'oci'}
+    rows = []
+    for provider in plan.get('configuration', {}).get('provider_config', {}).values():
+        rows.append({
+            'fields': sorted(set(provider) & {'name', 'full_name', 'source', 'alias', 'expressions', 'version_constraint'}),
+            'name': provider.get('name') if provider.get('name') in known else 'other-or-absent',
+            'full_name': provider.get('full_name') if provider.get('full_name') in known else 'other-or-absent',
+        })
+    resources = sorted({c.get('provider_name') if c.get('provider_name') in known else 'other-or-absent'
+                        for c in plan.get('resource_changes', [])})
+    return {'configuration': rows, 'resource_providers': resources}
+
+
 def diagnostic():
     from scripts.oracle_api import Oracle
     oracle = Oracle()
@@ -99,7 +115,10 @@ def diagnostic():
         'Esta execução é somente leitura e não cria recursos. **Diagnóstico bem-sucedido não confirma uma VPS criada.**')
     previous = next((job for job in jobs if job.operation == 'PLAN' and job.lifecycle_state == 'SUCCEEDED'), None)
     if previous:
-        target = validate_plan(oracle.plan(previous.id, digest), oracle.compartment_id)
+        import json
+        plan = oracle.plan(previous.id, digest)
+        print('Esquema de providers do Plan: ' + json.dumps(provider_summary(plan), sort_keys=True))
+        target = validate_plan(plan, oracle.compartment_id)
         oracle.validate_capacity(target, inventory)
         print('Plano existente validado: A1 2 OCPUs, 12 GB, Oracle Linux 9, disco até 50 GB; cotas disponíveis.')
     else:
